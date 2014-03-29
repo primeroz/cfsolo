@@ -1,0 +1,110 @@
+bundle common classify {
+
+  # This section classifies hosts instances into roles based on the hostname
+  # I use a completely virtualized infrastructure with hostnames determined by
+  # on a role specific prefix and a hex string separated by an underscore.
+  # The hex string is the last 3 bytes of the MAC address of the lowest
+  # numbered interface (e.g., eth0). Instances are created this way by my
+  # provisioning system.
+
+  classes:
+
+    "dns_ns"        or => { classmatch("ns[0-9]*") };
+    "dns_forwarder" or => { classmatch("dns_[0-9a-f]*") };
+    "db_server"     or => { classmatch("db_[0-9a-f]*") };
+    "gitlab"        or => { classmatch("gitlab_[0-9a-f]*") };
+    "web_ext"       or => { classmatch("www_[0-9a-f]*") };
+    "web_int"       or => { classmatch("web_[0-9a-f]*") };
+    "xwiki"         or => { classmatch("xwiki_[0-9a-f]*") };
+
+    # Roles choose application bundles
+    "apache"        expression => "dpkg_repo|web_ext|web_int";
+    "bind"          expression => "dns_ns|dns_forwarder";
+    "postgresql"    expression => "db_server";
+    "tomcat"        expression => "xwiki|jira";
+    "rails"         expression => "gitlab"
+
+    # Roles and/or applications can be grouped
+    "app_server"    expression => "rails|tomcat"
+
+    # Applications may also depend on other applications
+    "sql_client"    expression => "app_server";
+    "ssl"           expression => "apache|tomcat|rails";
+    "stunnel"       expression => "mysql";
+
+}
+
+bundle common g {
+
+  # This section assigns bundles to application/role/grouping classes.
+  # An array is created, named **bundles**. Each *key* is named after
+  # a *bundle*. The *value* of each key is the input file where that
+  # bundle can be found.
+
+  vars:
+
+    # These classes were defined by me in the classify bundle
+    apache::
+      "bundles[apache]"     string => "apache.cf";
+
+    bind::
+      "bundles[bind]"       string => "bind.cf";
+
+    postgresql::
+      "bundles[postgresql]"      string => "postgresql.cf";
+
+    ssl::
+      "bundles[ssl]"        string => "ssl.cf";
+
+    stunnel::
+      "bundles[stunnel]"    string => "stunnel.cf";
+
+    # Thse are hard classes determined by cfengine. I don't need to explicitly
+    # classify them.
+    debian::
+      "bundles[dpkg]"       string => "dpkg.cf";
+      "bundles[debian]"     string => "debian.cf";
+
+    centos::
+      "bundles[rpm]"        string => "rpm.cf";
+      "bundles[centos]"     string => "centos.cf"
+
+    sunos_5_11::
+      "bundles[ips]"        string => "ips.cf";
+      "bundles[solaris]"    string => "solaris.cf";
+
+    xen_dom0::
+      "bundles[xen_dom0]",  string => "xen_dom.cf0";
+
+    # Now the magic.
+    # I create two slists. One named "sequence" and one named "inputs".
+    # The "sequence" slist contains a list of bundle names.
+    # The "inputs" slist contains a list of input files.
+    any::
+      "sequence"  slist => getindices("bundles");
+      "inputs"    slist => getvalues("bundles");
+
+}
+
+body common control {
+
+  # The bundlesequence now includes those things which are common to all, plus
+  # the contents of the slist "sequence" (which has ben dynamically generated),
+  # plus the unqualified hostname.
+  bundlesequence => { "global", "main", "@{g.sequence}", "${sys.uqhost}"};
+
+  # The inputs now includes common libraries and main.cf which will be run by
+  # all systems, plus the contents of the slist "inputs" (which has been
+  # dynamically) generated, plus an input based on the unqualified hostname.
+  inputs => { "cfengine_stdlib.cf", "digitalelf_stdlib.cf", "main.cf", "@{g.inputs}", "${sys.uqhost}.cf" };
+
+  # Sometimes I need to have any specific configuration for a single host (e.g.,
+  # one of dns_ns will be the master and the rest will be slaves so the master
+  # needs special configuration). The following options will allow cfengine to
+  # skip the hostname bundle/input if one does not exist (which it usually
+  # doesn't).
+  ignore_missing_bundles => "true";
+  ignore_missing_inputs  => "true";
+
+  version => "Community Promises.cf 1.0.0";
+}
