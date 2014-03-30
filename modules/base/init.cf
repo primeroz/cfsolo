@@ -1,0 +1,62 @@
+body file control {
+  namespace => "base";
+}
+
+bundle common base_common {
+
+  vars:
+
+    any::
+      "base_topdir"           string =>   "$(def.topdir)/modules/$(this.namespace)";
+      "base_datadir"          string =>   "$(base:base_common.base_topdir)/data";
+
+
+}
+
+bundle agent base_init {
+
+  methods:
+    any::
+      "base_cfg"   usebundle =>  base:base_cfg(),
+      handle  =>  "base_init_usebundle_base_cfg";
+
+    #base_cfg_has_base_packages_file::
+      "base_packages"   usebundle =>  base:base_packages("base:base_cfg.conf"),
+      handle  =>  "base_init_usebundle_base_packages";
+
+}
+
+bundle agent base_cfg {
+#Base Configuration Module
+
+  classes:
+
+    "base_cfg_has_base_packages_file"  expression =>   fileexists($(conf[_base_packages_file]));
+
+  vars:
+
+    debian::
+      "conf[_base_packages_file]"    string =>   "$(base:base_common.base_datadir)/base_packages.json";
+      "test" string =>  "TEST PORCODIO";
+
+    base_cfg_has_base_packages_file::
+      "base_packages_data"  data =>   readjson("$(conf[_base_packages_file])",1000);
+      "conf[_base_packages_list]"    slist =>  getvalues("base:base_cfg.base_packages_data[packages]");
+
+}
+
+bundle agent base_packages (cfg) {
+
+  vars:
+    "add_packages" slist => { "@($(cfg)[_base_packages_list])" };
+
+  methods:
+
+    "base_packages"   usebundle => default:cfe_package_ensure_present("$(add_packages)");
+
+
+  reports:
+    inform_mode::
+      "$(this.bundle): Got Packages list : $(add_packages)";
+
+}

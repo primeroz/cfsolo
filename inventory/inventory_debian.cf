@@ -1,0 +1,14 @@
+bundle common inventory_debian
+# @brief Debian inventory
+#
+# This common bundle is for Debian inventory work.
+{
+  classes:
+      "debian_pure" expression => "debian.!ubuntu",
+      comment => "pure Debian",
+      meta => { "inventory", "attribute_name=none" };
+
+      "debian_derived" expression => "debian.!debian_pure",
+      comment => "derived from Debian",
+      meta => { "inventory", "attribute_name=none" };
+}
