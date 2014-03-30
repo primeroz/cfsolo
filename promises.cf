@@ -61,7 +61,7 @@ bundle common g {
 
   vars:
 
-    cfengine_3_6::
+    cfengine_3_6.NeverEnabled::
       "libinputs" slist => {
                     "lib/3.6/paths.cf",
                     "lib/3.6/common.cf",
@@ -79,6 +79,8 @@ bundle common g {
                     "lib/3.6/reports.cf",
       };
 
+    cfengine_3_6::
+      "libinputs" slist => { "$(def.topdir)/lib/3.6/stdlib.cf" };
 
 
     # These classes were defined by me in the classify bundle
@@ -98,7 +100,7 @@ bundle common g {
     # classify them.
     debian::
       "bundles[base:base_init]"       string => "modules/base/init.cf";
-      "bundles[debian]"     string => "debian.cf";
+      #"bundles[debian]"     string => "debian.cf";
 
     # Now the magic.
     # I create two slists. One named "sequence" and one named "inputs".
