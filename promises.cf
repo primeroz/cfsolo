@@ -1,3 +1,26 @@
+bundle agent enc {
+
+  vars:
+    henc_has_list::
+      "encfile"      string => "$(def.topdir)/enc/${sys.uqhost}";
+
+  classes:
+      "henc_has_file" expression => isvariable("encfile") ;
+
+  commands:
+    !henc_classes_activated::
+      "$(def.topdir)/enc/enc.sh"
+        comment    => "Hierarchical classification for $(sys.fqhost)",
+        #args       => "$(encfile)",
+        args       => "$(def.topdir)/enc/debianbase",
+        classes    => always("henc_classes_activated"),
+        module     => "true" ;
+
+  reports:
+    linux::
+      "$(encfile) porcodio";
+}
+
 bundle common classify {
 
   # This section classifies hosts instances into roles based on the hostname
@@ -10,28 +33,23 @@ bundle common classify {
   classes:
 
     "dns_ns"        or => { classmatch("ns[0-9]*") };
-    "dns_forwarder" or => { classmatch("dns_[0-9a-f]*") };
-    "db_server"     or => { classmatch("db_[0-9a-f]*") };
-    "gitlab"        or => { classmatch("gitlab_[0-9a-f]*") };
-    "web_ext"       or => { classmatch("www_[0-9a-f]*") };
-    "web_int"       or => { classmatch("web_[0-9a-f]*") };
-    "xwiki"         or => { classmatch("xwiki_[0-9a-f]*") };
-
     # Roles choose application bundles
-    "apache"        expression => "dpkg_repo|web_ext|web_int";
     "bind"          expression => "dns_ns|dns_forwarder";
-    "postgresql"    expression => "db_server";
-    "tomcat"        expression => "xwiki|jira";
-    "rails"         expression => "gitlab"
 
-    # Roles and/or applications can be grouped
-    "app_server"    expression => "rails|tomcat"
+}
 
-    # Applications may also depend on other applications
-    "sql_client"    expression => "app_server";
-    "ssl"           expression => "apache|tomcat|rails";
-    "stunnel"       expression => "mysql";
+bundle common inventory {
 
+  vars:
+
+    (cfengine_3_6).debian::
+      "bundles[inventory_autorun]"     string => "inventory/inventory_any.cf";
+      "bundles[inventory_lsb]"     string => "inventory/inventory_lsb.cf";
+      "bundles[inventory_debian]"     string => "inventory/inventory_debian.cf";
+
+    any::
+      "sequence"  slist => getindices("bundles");
+      "inputs"    slist => getvalues("bundles");
 }
 
 bundle common g {
@@ -43,10 +61,27 @@ bundle common g {
 
   vars:
 
-    # These classes were defined by me in the classify bundle
-    apache::
-      "bundles[apache]"     string => "apache.cf";
+    cfengine_3_6::
+      "libinputs" slist => {
+                    "lib/3.6/paths.cf",
+                    "lib/3.6/common.cf",
+                    "lib/3.6/commands.cf",
+                    "lib/3.6/packages.cf",
+                    "lib/3.6/files.cf",
+                    "lib/3.6/services.cf",
+                    "lib/3.6/processes.cf",
+                    "lib/3.6/storage.cf",
+                    "lib/3.6/databases.cf",
+                    "lib/3.6/users.cf",
+                    "lib/3.6/monitor.cf",
+                    "lib/3.6/guest_environments.cf",
+                    "lib/3.6/bundles.cf",
+                    "lib/3.6/reports.cf",
+      };
 
+
+
+    # These classes were defined by me in the classify bundle
     bind::
       "bundles[bind]"       string => "bind.cf";
 
@@ -62,19 +97,8 @@ bundle common g {
     # Thse are hard classes determined by cfengine. I don't need to explicitly
     # classify them.
     debian::
-      "bundles[dpkg]"       string => "dpkg.cf";
+      "bundles[base:base_init]"       string => "modules/base/init.cf";
       "bundles[debian]"     string => "debian.cf";
-
-    centos::
-      "bundles[rpm]"        string => "rpm.cf";
-      "bundles[centos]"     string => "centos.cf"
-
-    sunos_5_11::
-      "bundles[ips]"        string => "ips.cf";
-      "bundles[solaris]"    string => "solaris.cf";
-
-    xen_dom0::
-      "bundles[xen_dom0]",  string => "xen_dom.cf0";
 
     # Now the magic.
     # I create two slists. One named "sequence" and one named "inputs".
@@ -91,12 +115,31 @@ body common control {
   # The bundlesequence now includes those things which are common to all, plus
   # the contents of the slist "sequence" (which has ben dynamically generated),
   # plus the unqualified hostname.
-  bundlesequence => { "global", "main", "@{g.sequence}", "${sys.uqhost}"};
+  #bundlesequence => { "global", "main", "@{inventory.sequence}", "@{g.sequence}", "${sys.uqhost}"};
+  bundlesequence => { "enc", "@{inventory.sequence}", "@{g.sequence}", "${sys.uqhost}"};
 
   # The inputs now includes common libraries and main.cf which will be run by
   # all systems, plus the contents of the slist "inputs" (which has been
   # dynamically) generated, plus an input based on the unqualified hostname.
-  inputs => { "cfengine_stdlib.cf", "digitalelf_stdlib.cf", "main.cf", "@{g.inputs}", "${sys.uqhost}.cf" };
+  #inputs => { "cfengine_stdlib.cf", "main.cf", "@{g.inputs}", "${sys.uqhost}.cf" };
+
+  inputs => {
+
+            # File definition for global variables and classes
+            "def.cf",
+
+            # Cfengine StdLib
+            @(g.libinputs),
+
+            # Inventory policy
+            @(inventory.inputs),
+
+            # g policy
+            @(g.inputs),
+
+  };
+
+
 
   # Sometimes I need to have any specific configuration for a single host (e.g.,
   # one of dns_ns will be the master and the rest will be slaves so the master
@@ -106,5 +149,5 @@ body common control {
   ignore_missing_bundles => "true";
   ignore_missing_inputs  => "true";
 
-  version => "Community Promises.cf 1.0.0";
+  version => "Prz CFSolo Promises.cf 0.0.1";
 }
