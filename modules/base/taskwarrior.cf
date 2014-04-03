@@ -1,0 +1,49 @@
+body file control {
+  namespace => "base";
+}
+
+bundle common taskwarrior_common {
+
+}
+
+bundle agent taskwarrior_init {
+
+  methods:
+    any::
+      "taskwarrior_cfg"   usebundle =>  base:taskwarrior_cfg(),
+      handle  =>  "taskwarrior_init_usebundle_taskwarrior_cfg";
+
+}
+
+bundle agent taskwarrior_cfg {
+
+  classes:
+
+    "taskwarrior_cfg_has_taskwarrior_config_file"  expression =>   fileexists($(conf[_taskwarrior_config_file]));
+
+  vars:
+
+    debian::
+      "conf[_taskwarrior_config_file]"    string =>   "$(base:base_common.base_datadir)/taskwarrior_config.json";
+
+    taskwarrior_cfg_has_taskwarrior_packages_file::
+      "taskwarrior_config_data"  data =>   readjson("$(conf[_taskwarrior_config_file])",1000);
+      #"conf[_taskwarrior_config_list]"    slist =>  getvalues("base:base_cfg.taskwarrior_config_data[packages]");
+
+}
+
+#bundle agent base_packages (cfg) {
+#
+#  vars:
+#    "add_packages" slist => { "@($(cfg)[_base_packages_list])" };
+#
+#  methods:
+#
+#    "base_packages"   usebundle => default:cfe_package_ensure_present("$(add_packages)");
+#
+#
+#  reports:
+#    inform_mode::
+#      "$(this.bundle): Got Packages list : $(add_packages)";
+#
+#}

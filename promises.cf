@@ -17,7 +17,7 @@ bundle agent enc {
         module     => "true" ;
 
   reports:
-    linux::
+    inform_mode::
       "$(encfile) porcodio";
 }
 
@@ -99,8 +99,10 @@ bundle common g {
     # Thse are hard classes determined by cfengine. I don't need to explicitly
     # classify them.
     debian::
-      "bundles[base:base_init]"       string => "modules/base/init.cf";
       #"bundles[debian]"     string => "debian.cf";
+      "bundles[base:base_init]"            string => "modules/base/init.cf";
+      "bundles[base:users_init]"           string => "modules/base/users.cf";
+      "bundles[base:taskwarrior_init]"     string => "modules/base/taskwarrior.cf";
 
     # Now the magic.
     # I create two slists. One named "sequence" and one named "inputs".
